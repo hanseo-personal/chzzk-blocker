@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Chzzk Blocker</title>
+    <style>
+body {
+  font-family: Arial, sans-serif;
+  width: 300px;
+  padding: 15px;
+  background-color: #f4f7f6;
+  color: #333;
+}
+                                                                                                h2 {
+                                                                                                  margin-top: 0;
+                                                                                                  color: #2c3e50;
+                                                                                                  font-size: 1.2em;
+                                                                                                }
+                                                                                                .toggle-container {
+                                                                                                  display: flex;
+                                                                                                  align-items: center;
+                                                                                                  justify-content: space-between;
+                                                                                                  margin-bottom: 15px;
+                                                                                                  padding-bottom: 10px;
+                                                                                                  border-bottom: 1px solid #eee;
+                                                                                                }
+                                                                                                /* 마지막 토글 아래는 border-bottom 없음 */
+                                                                                                .toggle-container:last-of-type {
+                                                                                                  border-bottom: none;
+                                                                                                  margin-bottom: 20px; /* 태그 섹션과 간격 */
+                                                                                                }
+                                                                                                .switch {
+                                                                                                  position: relative;
+                                                                                                  display: inline-block;
+                                                                                                  width: 40px;
+                                                                                                  height: 24px;
+                                                                                                }
+                                                                                                .switch input {
+                                                                                                  opacity: 0;
+                                                                                                  width: 0;
+                                                                                                  height: 0;
+                                                                                                }
+                                                                                                .slider {
+                                                                                                  position: absolute;
+                                                                                                  cursor: pointer;
+                                                                                                  top: 0;
+                                                                                                  left: 0;
+                                                                                                  right: 0;
+                                                                                                  bottom: 0;
+                                                                                                  background-color: #ccc;
+                                                                                                  -webkit-transition: .4s;
+                                                                                                  transition: .4s;
+                                                                                                  border-radius: 24px;
+                                                                                                }
+                                                                                                .slider:before {
+                                                                                                  position: absolute;
+                                                                                                  content: "";
+                                                                                                  height: 16px;
+                                                                                                  width: 16px;
+                                                                                                  left: 4px;
+                                                                                                  bottom: 4px;
+                                                                                                  background-color: white;
+                                                                                                  -webkit-transition: .4s;
+                                                                                                  transition: .4s;
+                                                                                                  border-radius: 50%;
+                                                                                                }
+                                                                                                input:checked + .slider {
+                                                                                                  background-color: #28a745;
+                                                                                                }
+                                                                                                input:focus + .slider {
+                                                                                                  box-shadow: 0 0 1px #28a745;
+                                                                                                }
+                                                                                                input:checked + .slider:before {
+                                                                                                  -webkit-transform: translateX(16px);
+                                                                                                  -ms-transform: translateX(16px);
+                                                                                                  transform: translateX(16px);
+                                                                                                }
+
+                                                                                                .tag-input-section {
+                                                                                                  margin-bottom: 15px;
+                                                                                                  display: flex;
+                                                                                                }
+                                                                                                input[type="text"] {
+                                                                                                  flex-grow: 1;
+                                                                                                  padding: 8px;
+                                                                                                  border: 1px solid #ccc;
+                                                                                                  border-radius: 4px;
+                                                                                                  font-size: 0.9em;
+                                                                                                  box-sizing: border-box;
+                                                                                                }
+                                                                                                button#addTagBtn {
+                                                                                                  background-color: #3498db;
+                                                                                                  color: white;
+                                                                                                  border: none;
+                                                                                                  padding: 8px 12px;
+                                                                                                  border-radius: 4px;
+                                                                                                  cursor: pointer;
+                                                                                                  margin-left: 8px;
+                                                                                                  font-size: 0.9em;
+                                                                                                  transition: background-color 0.2s ease;
+                                                                                                }
+                                                                                                button#addTagBtn:hover {
+                                                                                                  background-color: #2980b9;
+                                                                                                }
+
+                                                                                                #blockedTagsList {
+                                                                                                  list-style: none;
+                                                                                                  padding: 0;
+                                                                                                  max-height: 150px; /* 팝업 크기에 맞춰 높이 제한 */
+                                                                                                  overflow-y: auto;
+                                                                                                  border: 1px solid #eee;
+                                                                                                  border-radius: 4px;
+                                                                                                  background-color: #fff;
+                                                                                                }
+                                                                                                #blockedTagsList li {
+                                                                                                  padding: 8px 10px;
+                                                                                                  border-bottom: 1px solid #f0f0f0;
+                                                                                                  display: flex;
+                                                                                                  justify-content: space-between;
+                                                                                                  align-items: center;
+                                                                                                  font-size: 0.9em;
+                                                                                                }
+                                                                                                #blockedTagsList li:last-child {
+                                                                                                  border-bottom: none;
+                                                                                                }
+                                                                                                #blockedTagsList li button {
+                                                                                                  background-color: #e74c3c;
+                                                                                                  color: white;
+                                                                                                  border: none;
+                                                                                                  padding: 4px 8px;
+                                                                                                  border-radius: 3px;
+                                                                                                  cursor: pointer;
+                                                                                                  font-size: 0.8em;
+                                                                                                  transition: background-color 0.2s ease;
+                                                                                                }
+                                                                                                #blockedTagsList li button:hover {
+                                                                                                  background-color: #c0392b;
+                                                                                                }
+                                                                                                #status {
+                                                                                                  margin-top: 10px;
+                                                                                                  font-size: 0.8em;
+                                                                                                  text-align: center;
+                                                                                                  color: #555;
+                                                                                                }
+    </style>
+  </head>
+  <body>
+    <div class="toggle-container">
+      <h2>대문 미리보기</h2>
+      <label class="switch">
+        <input type="checkbox" id="previewToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-container">
+      <h2>태그 차단 기능</h2>
+      <label class="switch">
+        <input type="checkbox" id="blockerToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <h2>차단 태그 관리</h2>
+    <div class="tag-input-section">
+      <input type="text" id="newTagInput" placeholder="새로운 태그 추가">
+      <button id="addTagBtn">추가</button>
+    </div>
+
+    <ul id="blockedTagsList">
+    </ul>
+
+    <div id="status"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
