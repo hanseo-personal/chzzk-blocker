@@ -17,9 +17,7 @@
     }
   },
   "permissions": [
-    "storage",
-    "activeTab",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
     "https://chzzk.naver.com/*"
