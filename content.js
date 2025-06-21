@@ -4,23 +4,33 @@ let blockedTags = []; // 크롬 스토리지에서 불러올 차단 태그 목�
 let isEnabled = true; // '방송 차단 기능' 활성화/비활성화 상태
 let isPreviewBlocked = true; // '대문 미리보기' 활성화/비활성화 상태 (true면 숨김)
 
+// 모든 가능한 방송 카드 셀렉터를 쉼표로 연결하여 사용합니다.
+// 이 변수를 전역 스코프로 이동시킵니다.
+const allStreamCardSelectors = 'li.home_component_item__fFarx, li.navigation_component_item__iMPOI, li.category_component_item__Sx3co, div.video_card_container__urjO6.video_card_vertical__+gTMT'; // <-- 이 부분이 변경됩니다!
+
+
 // 방송 카드들을 숨기는 주 함수
 function hideBlockedStreams() {
   // 1. '방송 차단 기능' 토글 상태에 따라 방송 카드 처리
   if (!isEnabled) {
     console.log("chzzk-blocker: 방송 차단 기능 비활성화됨. 모든 방송을 표시합니다.");
-    document.querySelectorAll('li.home_component_item__fFarx, li.navigation_component_item__iMPOI').forEach(card => {
+    document.querySelectorAll(allStreamCardSelectors).forEach(card => {
       card.style.display = ''; // 모두 표시
     });
   } else if (!blockedTags || blockedTags.length === 0) {
     console.log("chzzk-blocker: 차단 태그가 없습니다. 모든 방송을 표시합니다.");
-    document.querySelectorAll('li.home_component_item__fFarx, li.navigation_component_item__iMPOI').forEach(card => {
+    document.querySelectorAll(allStreamCardSelectors).forEach(card => {
       card.style.display = ''; // 모두 표시
     });
   } else {
     console.log("chzzk-blocker: 현재 차단 태그 목록:", blockedTags);
-    const streamCards = document.querySelectorAll('li.home_component_item__fFarx, li.navigation_component_item__iMPOI');
+    const streamCards = document.querySelectorAll(allStreamCardSelectors);
     streamCards.forEach(card => {
+      // 이미 처리된 카드인지 확인 (중복 처리 방지)
+      if (card.dataset.chzzkBlockerProcessed) {
+        return;
+      }
+
       card.style.display = ''; // 일단 기본 상태로 돌려놓고 재판단
 
       const categoryTagElements = card.querySelectorAll('.video_card_category__xQ15T');
@@ -31,7 +41,8 @@ function hideBlockedStreams() {
         const tagName = tagElement.textContent.trim();
         currentCardTags.push(tagName);
 
-        if (blockedTags.includes(tagName)) {
+        // 태그 비교 시 대소문자 구분 없이 처리
+        if (blockedTags.map(t => t.toLowerCase()).includes(tagName.toLowerCase())) {
           shouldBlock = true;
           break;
         }
@@ -42,6 +53,8 @@ function hideBlockedStreams() {
         console.log(`=> 차단! 해당 방송 카드 숨김: ${card.querySelector('.video_card_title__Amjk2')?.textContent.trim() || '제목 없음'}`);
         card.style.display = 'none'; // 방송 카드 전체를 숨김
       }
+      // 처리 완료 플래그 추가
+      card.dataset.chzzkBlockerProcessed = true;
     });
   }
 
@@ -49,15 +62,15 @@ function hideBlockedStreams() {
   handlePreviewVisibility();
 }
 
-// 대문 미리보기 숨기기/표시하기 함수 (새로 추가)
+// 대문 미리보기 숨기기/표시하기 함수 (이전과 동일)
 function handlePreviewVisibility() {
   const previewContainer = document.querySelector('.home_recommend_live_container__y16wk');
   if (previewContainer) {
-    if (isPreviewBlocked) { // isPreviewBlocked가 true면 숨김
+    if (isPreviewBlocked) {
       previewContainer.style.display = 'none';
       console.log('chzzk-blocker: 대문 미리보기 숨김.');
-    } else { // false면 표시
-      previewContainer.style.display = ''; // 원래대로 표시
+    } else {
+      previewContainer.style.display = '';
       console.log('chzzk-blocker: 대문 미리보기 표시.');
     }
   } else {
@@ -65,22 +78,19 @@ function handlePreviewVisibility() {
   }
 }
 
-
-// 초기 설정 (태그 목록, 방송 차단 기능, 대문 미리보기 활성화 상태)을 불러옵니다.
+// 초기 설정 (태그 목록, 방송 차단 기능, 대문 미리보기 활성화 상태)을 불러옵니다. (이전과 동일)
 chrome.storage.sync.get(['blockedTags', 'chzzkBlockerEnabled', 'chzzkPreviewBlockerEnabled'], function(result) {
   if (result.blockedTags) {
     blockedTags = result.blockedTags;
   }
-  // 'chzzkBlockerEnabled' 기본값: true (태그 차단 활성화)
   isEnabled = typeof result.chzzkBlockerEnabled === 'undefined' ? true : result.chzzkBlockerEnabled;
-  // 'chzzkPreviewBlockerEnabled' 기본값: true (대문 미리보기 숨김)
   isPreviewBlocked = typeof result.chzzkPreviewBlockerEnabled === 'undefined' ? true : result.chzzkPreviewBlockerEnabled;
 
   console.log('chzzk-blocker: 초기 설정 로드 - 태그:', blockedTags, '방송 차단 활성화:', isEnabled, '미리보기 숨김:', isPreviewBlocked);
-  hideBlockedStreams(); // 모든 설정 적용 및 UI 업데이트
+  hideBlockedStreams();
 });
 
-// 크롬 스토리지의 변경 사항을 감지하여 실시간으로 반영합니다.
+// 크롬 스토리지의 변경 사항을 감지하여 실시간으로 반영합니다. (이전과 동일)
 chrome.storage.onChanged.addListener(function(changes, namespace) {
   if (namespace === 'sync') {
     if (changes.blockedTags) {
@@ -95,7 +105,7 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
       isPreviewBlocked = changes.chzzkPreviewBlockerEnabled.newValue;
       console.log('chzzk-blocker: 대문 미리보기 숨김 상태 업데이트:', isPreviewBlocked);
     }
-    hideBlockedStreams(); // 변경된 설정으로 방송 다시 숨김 처리
+    hideBlockedStreams();
   }
 });
 
@@ -106,8 +116,9 @@ const observer = new MutationObserver((mutations) => {
     if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
       for (let i = 0; i < mutation.addedNodes.length; i++) {
         const node = mutation.addedNodes[i];
-        // 홈 화면과 전체 방송 페이지의 li 요소 모두 감지
-        if (node.nodeType === 1 && (node.matches('li.home_component_item__fFarx') || node.matches('li.navigation_component_item__iMPOI') || node.querySelector('li.home_component_item__fFarx') || node.querySelector('li.navigation_component_item__iMPOI'))) {
+        // 모든 가능한 방송 카드 셀렉터를 사용하여 새롭게 추가된 노드를 감지합니다.
+        // allStreamCardSelectors는 이제 전역 변수이므로 접근 가능합니다.
+        if (node.nodeType === 1 && (node.matches(allStreamCardSelectors) || node.querySelector(allStreamCardSelectors))) {
           newContentAdded = true;
           break;
         }
@@ -141,6 +152,14 @@ if (!targetNode) {
   targetNode = document.querySelector('.css-1dbjc4n.r-1l5rcj .r-1wt4aef');
   if (targetNode) {
     console.log('chzzk-blocker: 대상 노드 (.css-1dbjc4n.r-1l5rcj .r-1wt4aef) 발견.');
+  }
+}
+
+// **추가: 라이브 카드 목록을 직접 감싸는 ul.category_component_list__S8_8f (가장 흔한 부모 요소 중 하나)**
+if (!targetNode) {
+  targetNode = document.querySelector('ul.category_component_list__S8_8f');
+  if (targetNode) {
+    console.log('chzzk-blocker: 대상 노드 (ul.category_component_list__S8_8f) 발견.');
   }
 }
 
