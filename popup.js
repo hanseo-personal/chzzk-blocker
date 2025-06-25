@@ -1,123 +1,166 @@
 // popup.js
 
-document.addEventListener('DOMContentLoaded', initializePopup);
+document.addEventListener('DOMContentLoaded', function() {
+  const blockStreamsToggle = document.getElementById('blockStreamsToggle');
+  const blockPreviewToggle = document.getElementById('blockPreviewToggle');
+  const tagInput = document.getElementById('tagInput');
+  const addTagBtn = document.getElementById('addTagBtn');
+  const blockedTagsList = document.getElementById('blockedTagsList');
+  const toggleTagListBtn = document.getElementById('toggleTagList');
+  const blockedTagsContainer = document.getElementById('blockedTagsContainer');
 
-const blockerToggle = document.getElementById('blockerToggle'); // 태그 차단 기능 토글
-const previewToggle = document.getElementById('previewToggle'); // 대문 미리보기 토글
-const newTagInput = document.getElementById('newTagInput');
-const addTagBtn = document.getElementById('addTagBtn');
-const blockedTagsList = document.getElementById('blockedTagsList');
-const statusDiv = document.getElementById('status');
+  let currentBlockedTags = []; // 현재 차단 태그 목록
 
-// 팝업 초기화: 저장된 설정 불러오기 및 UI 업데이트
-function initializePopup() {
-  // 1. "대문 미리보기" 토글 상태 불러오기 (순서 변경)
-  chrome.storage.sync.get(['chzzkPreviewBlockerEnabled'], function(result) {
-    // 기본값은 true (미리보기 숨김)
-    previewToggle.checked = typeof result.chzzkPreviewBlockerEnabled === 'undefined' ? true : result.chzzkPreviewBlockerEnabled;
-  });
+  // 차단 태그 목록을 UI에 표시하는 함수
+  function renderBlockedTags() {
+    blockedTagsList.innerHTML = ''; // 기존 목록 초기화
+    if (currentBlockedTags.length === 0) {
+      const li = document.createElement('li');
+      li.textContent = '차단 태그가 없습니다.';
+      li.style.fontStyle = 'italic';
+      li.style.color = '#777';
+      li.style.justifyContent = 'center';
+      blockedTagsList.appendChild(li);
+    } else {
+      currentBlockedTags.forEach(tag => {
+        const li = document.createElement('li');
+        li.textContent = tag;
 
-  // 2. "태그 차단 기능" 토글 상태 불러오기 (순서 변경)
-  chrome.storage.sync.get(['chzzkBlockerEnabled'], function(result) {
-    // 기본값은 true (활성화)
-    blockerToggle.checked = typeof result.chzzkBlockerEnabled === 'undefined' ? true : result.chzzkBlockerEnabled;
-  });
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'X';
+        deleteBtn.style.marginLeft = '5px';
+        deleteBtn.style.cursor = 'pointer';
+        deleteBtn.onclick = function() {
+          removeTag(tag);
+        };
+        li.appendChild(deleteBtn);
+        blockedTagsList.appendChild(li);
+      });
+    }
+  }
 
-  // 차단 태그 목록 불러오기
-  loadBlockedTags();
+  // 태그 추가
+  addTagBtn.addEventListener('click', function() {
+    const newTag = tagInput.value.trim();
+    if (newTag && !currentBlockedTags.includes(newTag)) {
+      currentBlockedTags.push(newTag);
+      tagInput.value = ''; // 입력창 초기화
+      chrome.storage.sync.set({ blockedTags: currentBlockedTags }, function() {
+        renderBlockedTags(); // 태그 추가 후 목록 다시 그리기
 
-  // 이벤트 리스너 연결
-  previewToggle.addEventListener('change', togglePreviewBlocker); // 순서 변경
-  blockerToggle.addEventListener('change', toggleBlocker);     // 순서 변경
-  addTagBtn.addEventListener('click', addTag);
-  // Enter 키로 태그 추가
-  newTagInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      addTag();
+        // 태그 추가 시 목록이 닫혀있다면 펼치고, 펼쳐져 있다면 높이를 재조정
+        // DOM 업데이트가 완료된 후 실행되도록 setTimeout 사용
+        setTimeout(() => {
+          const isCollapsed = blockedTagsContainer.style.maxHeight === '0px';
+          if (isCollapsed) {
+            toggleTagListBtn.click(); // 닫혀있으면 펼치기
+          } else {
+            // 펼쳐져 있다면 높이를 콘텐츠에 맞게 다시 계산하여 업데이트
+            blockedTagsContainer.style.maxHeight = blockedTagsList.scrollHeight + 16 + 'px';
+          }
+        }, 50); // 50ms 정도 딜레이를 주어 DOM 업데이트 기다림
+        console.log('chzzk-blocker: 태그 추가됨:', newTag);
+      });
     }
   });
-}
 
-// "태그 차단 기능" 활성화/비활성화
-function toggleBlocker() {
-  const isChecked = blockerToggle.checked;
-  chrome.storage.sync.set({ chzzkBlockerEnabled: isChecked }, function() {
-    // 메시지 텍스트 변경
-    showStatus(isChecked ? '태그 차단 기능 활성화됨' : '태그 차단 기능 비활성화됨', isChecked ? 'green' : 'red');
-  });
-}
+  // 태그 삭제
+  function removeTag(tagToRemove) {
+    currentBlockedTags = currentBlockedTags.filter(tag => tag !== tagToRemove);
+    chrome.storage.sync.set({ blockedTags: currentBlockedTags }, function() {
+      renderBlockedTags(); // 태그 삭제 후 목록 다시 그리기
 
-// "대문 미리보기" 숨김/표시 (토글이 켜져 있으면 숨김)
-function togglePreviewBlocker() {
-  const isChecked = previewToggle.checked;
-  chrome.storage.sync.set({ chzzkPreviewBlockerEnabled: isChecked }, function() {
-    showStatus(isChecked ? '대문 미리보기 숨김' : '대문 미리보기 표시', isChecked ? 'green' : 'red');
-  });
-}
-
-// 저장된 차단 태그 목록을 불러와 UI에 표시
-function loadBlockedTags() {
-  chrome.storage.sync.get(['blockedTags'], function(result) {
-    const tags = result.blockedTags || [];
-    blockedTagsList.innerHTML = ''; // 기존 목록 초기화
-    tags.forEach(tag => addTagToDisplay(tag));
-  });
-}
-
-// 새로운 태그를 추가하는 함수
-function addTag() {
-  const tag = newTagInput.value.trim();
-  if (tag) {
-    chrome.storage.sync.get(['blockedTags'], function(result) {
-      const tags = result.blockedTags || [];
-      if (!tags.includes(tag)) { // 중복 태그 방지
-        tags.push(tag);
-        chrome.storage.sync.set({ blockedTags: tags }, function() {
-          addTagToDisplay(tag);
-          newTagInput.value = ''; // 입력 필드 초기화
-          showStatus(`'${tag}' 태그가 추가되었습니다.`, 'green');
-        });
-      } else {
-        showStatus(`'${tag}'은(는) 이미 존재하는 태그입니다.`, 'orange');
-      }
+      setTimeout(() => { // DOM 업데이트 후 높이 재조정
+        if (currentBlockedTags.length === 0) { // 태그가 모두 삭제되면 컨테이너를 닫습니다.
+          blockedTagsContainer.style.maxHeight = '0px';
+          blockedTagsContainer.style.padding = '0 8px';
+          blockedTagsContainer.style.border = '1px solid transparent';
+          toggleTagListBtn.textContent = '펼치기';
+        } else {
+          // 태그가 남아있는데 닫혀있다면 펼치고, 펼쳐져 있다면 높이를 재조정
+          const isCollapsed = blockedTagsContainer.style.maxHeight === '0px';
+          if (isCollapsed) {
+            // 닫혀있으면 펼치기 (click 이벤트가 내부적으로 높이 계산)
+            toggleTagListBtn.click();
+          } else {
+            // 펼쳐져 있다면 높이를 콘텐츠에 맞게 다시 계산하여 업데이트
+            blockedTagsContainer.style.maxHeight = blockedTagsList.scrollHeight + 16 + 'px';
+          }
+        }
+      }, 50); // 50ms 딜레이
+      console.log('chzzk-blocker: 태그 삭제됨:', tagToRemove);
     });
-  } else {
-    showStatus('태그를 입력해주세요.', 'red');
   }
-}
 
-// UI에 태그를 표시하고 삭제 버튼을 추가
-function addTagToDisplay(tag) {
-  const li = document.createElement('li');
-  li.textContent = tag;
+  // 스토리지에서 설정 불러오기 및 UI 업데이트
+  chrome.storage.sync.get(['blockedTags', 'chzzkBlockerEnabled', 'chzzkPreviewBlockerEnabled'], function(result) {
+    if (result.blockedTags) {
+      currentBlockedTags = result.blockedTags;
+    }
+    renderBlockedTags(); // 초기 로드 시 태그 표시
 
-  const deleteButton = document.createElement('button');
-  deleteButton.textContent = '삭제';
-  deleteButton.addEventListener('click', function() {
-    removeTag(tag, li);
+    // 초기 로드 시 태그 목록 컨테이너는 항상 닫힌 상태로 시작
+    blockedTagsContainer.style.maxHeight = '0px';
+    blockedTagsContainer.style.padding = '0 8px';
+    blockedTagsContainer.style.border = '1px solid transparent';
+    toggleTagListBtn.textContent = '펼치기';
+
+
+    // 체크박스 상태 로드
+    if (typeof result.chzzkBlockerEnabled !== 'undefined') {
+      blockStreamsToggle.checked = result.chzzkBlockerEnabled;
+    } else {
+      blockStreamsToggle.checked = true; // 기본값: 활성화
+    }
+    if (typeof result.chzzkPreviewBlockerEnabled !== 'undefined') {
+      blockPreviewToggle.checked = result.chzzkPreviewBlockerEnabled;
+    } else {
+      blockPreviewToggle.checked = true; // 기본값: 활성화
+    }
   });
 
-  li.appendChild(deleteButton);
-  blockedTagsList.appendChild(li);
-}
-
-// 태그를 삭제하는 함수
-function removeTag(tagToRemove, listItem) {
-  chrome.storage.sync.get(['blockedTags'], function(result) {
-    let tags = result.blockedTags || [];
-    const updatedTags = tags.filter(tag => tag !== tagToRemove); // 삭제할 태그 제외
-    chrome.storage.sync.set({ blockedTags: updatedTags }, function() {
-      listItem.remove(); // UI에서 제거
-      showStatus(`'${tagToRemove}' 태그가 삭제되었습니다.`, 'green');
+  // '방송 차단 기능' 토글 상태 저장
+  blockStreamsToggle.addEventListener('change', function() {
+    chrome.storage.sync.set({ chzzkBlockerEnabled: blockStreamsToggle.checked }, function() {
+      console.log('chzzk-blocker: 방송 차단 기능 활성화 상태 저장:', blockStreamsToggle.checked);
     });
   });
-}
 
-// 상태 메시지 표시
-function showStatus(message, color) {
-  statusDiv.textContent = message;
-  statusDiv.style.color = color;
-  setTimeout(() => {
-    statusDiv.textContent = ''; // 3초 후 메시지 제거
-  }, 3000);
-}
+  // '대문 미리보기 숨기기' 토글 상태 저장
+  blockPreviewToggle.addEventListener('change', function() {
+    chrome.storage.sync.set({ chzzkPreviewBlockerEnabled: blockPreviewToggle.checked }, function() {
+      console.log('chzzk-blocker: 대문 미리보기 숨기기 상태 저장:', blockPreviewToggle.checked);
+    });
+  });
+
+  // 태그 리스트 펼치기/접기 토글 기능
+  toggleTagListBtn.addEventListener('click', function() {
+    const isCollapsed = blockedTagsContainer.style.maxHeight === '0px';
+
+    if (isCollapsed) {
+      // 현재 접혀있음 -> 펼치기
+      blockedTagsContainer.style.maxHeight = blockedTagsList.scrollHeight + 16 + 'px'; // 콘텐츠 높이 + 패딩(위아래 8px씩 총 16px)
+      blockedTagsContainer.style.padding = '8px';
+      blockedTagsContainer.style.border = '1px solid #ddd';
+      toggleTagListBtn.textContent = '접기';
+    } else {
+      // 현재 펼쳐져 있음 -> 접기
+      blockedTagsContainer.style.maxHeight = '0px';
+      blockedTagsContainer.style.padding = '0 8px';
+      blockedTagsContainer.style.border = '1px solid transparent';
+      toggleTagListBtn.textContent = '펼치기';
+    }
+  });
+
+  // Enter 키로 태그 추가
+  tagInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault(); // 기본 Enter 동작 방지
+      // setTimeout을 사용하여 이벤트 루프 다음 틱에서 addTagBtn.click() 호출
+      // 이렇게 하면 입력 필드에 마지막 글자가 완전히 반영될 시간을 줍니다.
+      setTimeout(() => {
+        addTagBtn.click();
+      }, 0);
+    }
+  });
+});
