@@ -4,7 +4,9 @@ let blockedTags = [];
 let isEnabled = true;
 let isPreviewBlocked = true;
 let isBannerBlocked = true;
-let isChzzkBlockedUserStreamBlocked = true; // ✨ 치지직 자체 차단 방송 숨김 여부
+let isChzzkBlockedUserStreamBlocked = true;
+let isToolbarEventBlocked = true;
+let isLiveChattingInputTooltipBlocked = true; // ✨ 새로 추가: 채팅창 이벤트 알림 숨김 여부
 
 // --- 셀렉터 강화 ---
 const allStreamCardSelectors =
@@ -44,10 +46,17 @@ const previewContainerSelectors =
   'div[class*="recommend_live_list__"], ' +
   'div[class*="live_recommend_area__"]';
 
-// 치지직 자체 차단 유저 라이브 셀렉터 (이번에는 LI 태그 자체를 대상으로)
 const chzzkBlockedUserStreamSelectors =
-  'li.category_component_item__Sx3co:has(div.video_card_is_block__cGuyo), ' + // ✨ 변경: LI에 직접 적용
-  'li[class*="home_list_item__"]:has(div.video_card_is_block__cGuyo)'; // ✨ 변경: LI에 직접 적용
+  'li.category_component_item__Sx3co:has(div.video_card_is_block__cGuyo), ' +
+  'li[class*="home_list_item__"]:has(div.video_card_is_block__cGuyo)';
+
+const toolbarEventTooltipSelectors =
+  'span.toolbar_tooltip__1tjo3';
+
+// ✨ 새로 추가: 채팅창 입력 필드 상단 툴팁 셀렉터
+const liveChattingInputTooltipSelectors =
+  'span.live_chatting_input_tooltip__1k-j9';
+
 
 // CSS 규칙을 동적으로 삽입하여 요소를 즉시 숨김
 function injectCSSRules() {
@@ -71,15 +80,23 @@ function injectCSSRules() {
     sheet.insertRule(`${previewContainerSelectors} { display: none !important; }`, sheet.cssRules.length);
     console.log('chzzk-blocker: CSS로 미리보기 숨김 규칙 적용.');
   }
-  // ✨ 변경: 치지직 자체 차단 방송 숨김 규칙을 다시 display: none !important로 변경하여 공간 자체를 제거
   if (isChzzkBlockedUserStreamBlocked) {
     sheet.insertRule(`${chzzkBlockedUserStreamSelectors} { display: none !important; }`, sheet.cssRules.length);
     console.log('chzzk-blocker: CSS로 치지직 자체 차단 방송 빈 공간 제거 규칙 적용.');
   }
+  if (isToolbarEventBlocked) {
+    sheet.insertRule(`${toolbarEventTooltipSelectors} { display: none !important; }`, sheet.cssRules.length);
+    console.log('chzzk-blocker: CSS로 툴바 이벤트 알림 숨김 규칙 적용.');
+  }
+  // ✨ 새로 추가: 채팅창 이벤트 알림 숨김 규칙
+  if (isLiveChattingInputTooltipBlocked) {
+    sheet.insertRule(`${liveChattingInputTooltipSelectors} { display: none !important; }`, sheet.cssRules.length);
+    console.log('chzzk-blocker: CSS로 채팅창 이벤트 알림 숨김 규칙 적용.');
+  }
 }
 
 
-// 방송 카드들을 숨기는 주 함수
+// 방송 카드들을 숨기는 주 함수 (이 부분은 이전과 동일하게 유지)
 function hideBlockedStreams() {
   const streamCards = document.querySelectorAll(allStreamCardSelectors);
 
@@ -118,7 +135,6 @@ function hideBlockedStreams() {
     let actualCardContent = card;
     if (card.tagName === 'LI') {
       actualCardContent = card.querySelector('div[class*="video_card_container__"]');
-      // 치지직 자체 차단 방송은 여기서 스킵
       if (actualCardContent && actualCardContent.classList.contains('video_card_is_block__cGuyo')) {
         card.dataset.chzzkBlockerProcessed = true;
         return;
@@ -127,7 +143,7 @@ function hideBlockedStreams() {
         card.dataset.chzzkBlockerProcessed = true;
         return;
       }
-    } else { // card가 DIV인 경우 (allStreamCardSelectors에 DIV도 포함되므로)
+    } else {
       if (card.classList.contains('video_card_is_block__cGuyo')) {
         card.dataset.chzzkBlockerProcessed = true;
         return;
@@ -175,7 +191,7 @@ function hideBlockedStreams() {
 
 // 스토리지에서 설정 로드 및 적용
 function loadSettingsAndApply() {
-  chrome.storage.sync.get(['blockedTags', 'chzzkBlockerEnabled', 'chzzkPreviewBlockerEnabled', 'chzzkBannerBlockerEnabled', 'chzzkBlockedUserStreamBlocked'], function(result) {
+  chrome.storage.sync.get(['blockedTags', 'chzzkBlockerEnabled', 'chzzkPreviewBlockerEnabled', 'chzzkBannerBlockerEnabled', 'chzzkBlockedUserStreamBlocked', 'isToolbarEventBlocked', 'isLiveChattingInputTooltipBlocked'], function(result) { // ✨ isLiveChattingInputTooltipBlocked 추가
     if (result.blockedTags) {
       blockedTags = result.blockedTags;
     }
@@ -183,8 +199,10 @@ function loadSettingsAndApply() {
     isPreviewBlocked = result.chzzkPreviewBlockerEnabled !== undefined ? result.chzzkPreviewBlockerEnabled : true;
     isBannerBlocked = result.chzzkBannerBlockerEnabled !== undefined ? result.chzzkBannerBlockerEnabled : true;
     isChzzkBlockedUserStreamBlocked = result.chzzkBlockedUserStreamBlocked !== undefined ? result.chzzkBlockedUserStreamBlocked : true;
+    isToolbarEventBlocked = result.isToolbarEventBlocked !== undefined ? result.isToolbarEventBlocked : true;
+    isLiveChattingInputTooltipBlocked = result.isLiveChattingInputTooltipBlocked !== undefined ? result.isLiveChattingInputTooltipBlocked : true; // ✨ 새로 추가
 
-    console.log('chzzk-blocker: 설정 로드 - 태그:', blockedTags, '방송 차단 활성화:', isEnabled, '미리보기 숨김:', isPreviewBlocked, '배너 숨김:', isBannerBlocked, '치지직 자체 차단 방송 숨김:', isChzzkBlockedUserStreamBlocked);
+    console.log('chzzk-blocker: 설정 로드 - 태그:', blockedTags, '방송 차단 활성화:', isEnabled, '미리보기 숨김:', isPreviewBlocked, '배너 숨김:', isBannerBlocked, '치지직 자체 차단 방송 숨김:', isChzzkBlockedUserStreamBlocked, '툴바 이벤트 숨김:', isToolbarEventBlocked, '채팅창 이벤트 숨김:', isLiveChattingInputTooltipBlocked); // ✨ 로그에도 추가
 
     injectCSSRules();
     hideBlockedStreams();
@@ -214,6 +232,14 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
       isChzzkBlockedUserStreamBlocked = changes.chzzkBlockedUserStreamBlocked.newValue;
       console.log('chzzk-blocker: 치지직 자체 차단 방송 숨김 상태 업데이트:', isChzzkBlockedUserStreamBlocked);
     }
+    if (changes.isToolbarEventBlocked) {
+      isToolbarEventBlocked = changes.isToolbarEventBlocked.newValue;
+      console.log('chzzk-blocker: 툴바 이벤트 알림 숨김 상태 업데이트:', isToolbarEventBlocked);
+    }
+    if (changes.isLiveChattingInputTooltipBlocked) { // ✨ 새로 추가
+      isLiveChattingInputTooltipBlocked = changes.isLiveChattingInputTooltipBlocked.newValue;
+      console.log('chzzk-blocker: 채팅창 이벤트 알림 숨김 상태 업데이트:', isLiveChattingInputTooltipBlocked);
+    }
     injectCSSRules();
     hideBlockedStreams();
   }
@@ -232,7 +258,9 @@ const observer = new MutationObserver((mutations) => {
           if (node.matches(allStreamCardSelectors) || node.querySelector(allStreamCardSelectors) ||
             node.matches(bannerContainerSelectors) || node.querySelector(bannerContainerSelectors) ||
             node.matches(previewContainerSelectors) || node.querySelector(previewContainerSelectors) ||
-            node.matches(chzzkBlockedUserStreamSelectors) || node.querySelector(chzzkBlockedUserStreamSelectors)) {
+            node.matches(chzzkBlockedUserStreamSelectors) || node.querySelector(chzzkBlockedUserStreamSelectors) ||
+            node.matches(toolbarEventTooltipSelectors) || node.querySelector(toolbarEventTooltipSelectors) ||
+            node.matches(liveChattingInputTooltipSelectors) || node.querySelector(liveChattingInputTooltipSelectors)) { // ✨ 새로 추가
             contentChanged = true;
           }
         }
@@ -242,7 +270,11 @@ const observer = new MutationObserver((mutations) => {
       if (mutation.target.matches(allStreamCardSelectors) ||
         mutation.target.closest(allStreamCardSelectors) ||
         mutation.target.matches(chzzkBlockedUserStreamSelectors) ||
-        mutation.target.closest(chzzkBlockedUserStreamSelectors)) {
+        mutation.target.closest(chzzkBlockedUserStreamSelectors) ||
+        mutation.target.matches(toolbarEventTooltipSelectors) ||
+        mutation.target.closest(toolbarEventTooltipSelectors) ||
+        mutation.target.matches(liveChattingInputTooltipSelectors) || // ✨ 새로 추가
+        mutation.target.closest(liveChattingInputTooltipSelectors)) { // ✨ 새로 추가
         if (mutation.target.style.display === 'none' && mutation.target.style.visibility !== 'hidden') {
           console.log(`chzzk-blocker: 감지된 요소의 인라인 style 변경 (display: none). 재처리합니다.`);
           styleAttributeChangedOnBlockedCard = true;
